@@ -1,0 +1,13 @@
+# macOS
+.DS_Store
+
+# Arduino IDE build output
+build/
+*.bin
+*.elf
+*.map
+
+# Editor / IDE
+.vscode/
+.idea/
+*.theia-workspace

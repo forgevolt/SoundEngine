@@ -1,0 +1,51 @@
+#######################################
+# Syntax coloring for SoundEngine
+#######################################
+
+#######################################
+# Datatypes (KEYWORD1)
+#######################################
+
+SoundEngine	KEYWORD1
+AudioClip	KEYWORD1
+AudioPlayer	KEYWORD1
+ToneClip	KEYWORD1
+MelodyClip	KEYWORD1
+FileClip	KEYWORD1
+Waveform	KEYWORD1
+Note	KEYWORD1
+
+#######################################
+# Methods and Functions (KEYWORD2)
+#######################################
+
+begin	KEYWORD2
+play	KEYWORD2
+stop	KEYWORD2
+stopAll	KEYWORD2
+isPlaying	KEYWORD2
+setVolume	KEYWORD2
+getVolume	KEYWORD2
+click	KEYWORD2
+beep	KEYWORD2
+signal	KEYWORD2
+load	KEYWORD2
+unload	KEYWORD2
+isLoaded	KEYWORD2
+playTone	KEYWORD2
+playMelody	KEYWORD2
+setTone	KEYWORD2
+setMelody	KEYWORD2
+setRepeatForever	KEYWORD2
+getRepeatForever	KEYWORD2
+
+#######################################
+# Constants (LITERAL1)
+#######################################
+
+cAudioSampleRate	LITERAL1
+cNoteRest	LITERAL1
+eSine	LITERAL1
+eSquare	LITERAL1
+eTriangle	LITERAL1
+eSawtooth	LITERAL1
