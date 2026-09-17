@@ -1,7 +1,7 @@
 #pragma once
 
 #include <Arduino.h>
-#include "driver/i2s_std.h"
+#include "I2SOutput.h"
 #include "AudioClip.h"
 
 // ---- AudioPlayer -----------------------------------------------------------------------
@@ -20,14 +20,14 @@ class AudioPlayer
     static constexpr size_t cChunkSize = 128; // stereo frames mixed per prepareChunk() call
 
   public:
-    AudioPlayer(int lrclkPin, int bclkPin, int doutPin);
-    ~AudioPlayer();
+    // i2sPort is normally left alone; name one if something else on the board owns a port.
+    AudioPlayer(int lrclkPin, int bclkPin, int doutPin, int i2sPort = I2SOutput::cPortAuto);
 
     // Configures and enables the I2S TX channel. Deliberately separate from the constructor so
     // it can run from setup() with Serial open.
     bool begin();
 
-    // Owns an i2s_chan_handle_t and an intrusive playlist - copying would leave two objects
+    // Owns an I2S channel and an intrusive playlist - copying would leave two objects
     // pointing at the same OS handle/list, and the first destructor to run would invalidate
     // it for the other.
     AudioPlayer(const AudioPlayer&) = delete;
@@ -58,8 +58,9 @@ class AudioPlayer
 
   private:
     const int myLRCLKPin, myBCLKPin, myDOUTPin;
+    const int myI2SPort;
 
-    i2s_chan_handle_t myI2SHandle = nullptr;
+    I2SOutput myOutput;
 
     AudioClip* myFirstPlaying = nullptr; // head/tail of the intrusive playlist
     AudioClip* myLastPlaying  = nullptr;

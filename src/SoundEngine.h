@@ -25,7 +25,9 @@
 class SoundEngine
 {
   public:
-    SoundEngine(const int i2sLRC_Pin, const int i2sBCLK_Pin, const int i2sDOUT_Pin);
+    // i2sPort is normally left alone; name one if something else on the board owns a port.
+    SoundEngine(const int i2sLRC_Pin, const int i2sBCLK_Pin, const int i2sDOUT_Pin,
+                const int i2sPort = I2SOutput::cPortAuto);
     ~SoundEngine();
 
     // Owns a SemaphoreHandle_t and a TaskHandle_t - copying would leave two objects pointing at
@@ -33,9 +35,19 @@ class SoundEngine
     SoundEngine(const SoundEngine&) = delete;
     SoundEngine& operator=(const SoundEngine&) = delete;
 
+    // Defaults for the buffer-filler task. One above idle suits a sketch that has the CPU to
+    // itself; raise it above any other task that can hold the CPU for longer than the DMA
+    // buffer (~46 ms). The filler blocks between chunks, so a high priority costs nothing.
+    static constexpr int cDefaultTaskPriority = tskIDLE_PRIORITY + 1;
+
+    // Core 1 is where loop() runs, away from WiFi/BT on core 0. tskNO_AFFINITY leaves the
+    // placement to the scheduler.
+    static constexpr int cDefaultTaskCore = 1;
+
     // Brings up the I2S channel and starts the buffer-filler task. Returns false if either
-    // fails.
-    bool begin();
+    // fails. taskPriority is clamped to the FreeRTOS range; taskCore must be a core number or
+    // tskNO_AFFINITY.
+    bool begin(int taskPriority = cDefaultTaskPriority, int taskCore = cDefaultTaskCore);
 
     // Set/get the master volume (gain), applied on top of each clip's own volume.
     // Not persisted - the volume returns to AudioPlayer's default on every boot.
@@ -83,6 +95,6 @@ class SoundEngine
 
     static void fillBuffer(void* pvParameters);
     std::atomic<bool> myIsTaskRunning;
-    TaskHandle_t      myTaskHandle;
-    SemaphoreHandle_t myMutex;  
+    TaskHandle_t      myTaskHandle = nullptr;
+    SemaphoreHandle_t myMutex      = nullptr;
 };

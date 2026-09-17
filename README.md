@@ -27,8 +27,9 @@ void loop()
 
 ## Requirements
 
-- An ESP32. The I2S code uses the `i2s_std` API, which means **Arduino-ESP32 core 3.x** (ESP-IDF
-  5.x). It will not compile against core 2.x, where the header is `driver/i2s.h`.
+- An ESP32, with **Arduino-ESP32 core 2.0 or later**. The library selects the I2S driver to
+  match: the `i2s_std` API on core 3.x, the older `driver/i2s.h` one on core 2.x. Nothing in
+  the sketch changes either way.
 - An I2S DAC or amplifier — MAX98357A, PCM5102, UDA1334A and similar all work. Three pins:
 
   | signal | meaning |
@@ -38,6 +39,13 @@ void loop()
   | DOUT  | data out, ESP32 to DAC |
 
 No other library is needed.
+
+The engine takes a free I2S port by default. On core 2.x that is always port 0, because the
+older driver cannot allocate one; if something else on the board owns it, name another:
+
+```cpp
+SoundEngine sound(21, 14, 13, I2S_NUM_1);
+```
 
 ## Installing
 
@@ -176,8 +184,9 @@ reads but less robust; SPIFFS is deprecated.
 `dma_desc_num` × `dma_frame_num` frames — 8 × 256 by default, which is 2048 frames, or **46 ms at
 44.1 kHz**. A clip is mixed into the next 2.9 ms chunk and then queues behind whatever is already
 in the DMA. Those two constants in `AudioPlayer::begin()` are the lever if button feedback needs
-to feel tighter; shrinking them leaves the filler task, which runs at `tskIDLE_PRIORITY + 1`,
-less room to fall behind before it is audible.
+to feel tighter; shrinking them leaves the filler task less room to fall behind before it is
+audible. If it ever does fall behind, the gap is silence rather than a buzz - the channel is set
+to clear itself instead of replaying its last buffer.
 
 ## Volume
 
@@ -199,6 +208,26 @@ particular do not call `AudioClip::setVolume()` or `setRepeatForever()` directly
 may be playing — use `SoundEngine::setVolume(clip, volume)` instead.
 
 `play()`, `stop()`, `stopAll()` and `isPlaying()` are all safe to call from `loop()` at any time.
+
+### Where the task runs
+
+`begin()` takes the task's priority and core, and defaults to one above idle on core 1:
+
+```cpp
+sound.begin();                    // tskIDLE_PRIORITY + 1, core 1
+sound.begin(6);                   // higher priority, same core
+sound.begin(6, tskNO_AFFINITY);   // and let the scheduler place it
+```
+
+One above idle is fine when the sketch has the CPU largely to itself. It is not enough next to a
+library that runs its own task higher - a display driver redrawing a full screen, say. If that
+task holds the CPU for longer than the 46 ms the DMA is holding, the audio drops out; raise the
+priority above it. That is cheap to do: the filler mixes a 2.9 ms chunk and then blocks until the
+DMA wants more, so it is idle almost all the time and costs the rest of the sketch nothing however
+high it sits.
+
+Core 1 is where `loop()` runs, which keeps the filler away from WiFi and Bluetooth on core 0.
+`tskNO_AFFINITY` leaves the choice to the scheduler.
 
 ## Credits
 

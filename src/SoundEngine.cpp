@@ -13,8 +13,9 @@ static AudioClip beepClip(cSoundBeepWAV);
 static AudioClip signalClip(cSoundSignalWAV);
 
 // ----------------------------------------------------------------------------------------
-SoundEngine::SoundEngine(const int i2sLRC_Pin, const int i2sBCLK_Pin, const int i2sDOUT_Pin)
-: myAudio(i2sLRC_Pin, i2sBCLK_Pin, i2sDOUT_Pin),
+SoundEngine::SoundEngine(const int i2sLRC_Pin, const int i2sBCLK_Pin, const int i2sDOUT_Pin,
+                         const int i2sPort)
+: myAudio(i2sLRC_Pin, i2sBCLK_Pin, i2sDOUT_Pin, i2sPort),
   myIsTaskRunning(false)
 {
   myMutex = xSemaphoreCreateMutex();
@@ -32,12 +33,18 @@ SoundEngine::~SoundEngine()
 
   myIsTaskRunning = false;
   vTaskDelay(10 / portTICK_PERIOD_MS);   // let the task loop notice the flag and settle
-  vTaskDelete(myTaskHandle);
-  vSemaphoreDelete(myMutex);
+
+  // Null means begin() never ran, or failed before creating the task. Skipping is not
+  // optional: vTaskDelete(nullptr) deletes the calling task.
+  if (myTaskHandle != nullptr)
+    vTaskDelete(myTaskHandle);
+
+  if (myMutex != nullptr)
+    vSemaphoreDelete(myMutex);
 }
 
 // ----------------------------------------------------------------------------------------
-bool SoundEngine::begin()
+bool SoundEngine::begin(int taskPriority, int taskCore)
 {
   // Checked here rather than in the constructor: this object is constructed before Serial is up,
   // so a failure there could not be reported. A null handle would make every later
@@ -53,14 +60,15 @@ bool SoundEngine::begin()
   if (myAudio.begin() == false)
     return false;
 
+  // Out of range would assert inside xTaskCreatePinnedToCore(), i.e. a reboot.
+  if (taskPriority < 0)                     taskPriority = 0;
+  if (taskPriority >= configMAX_PRIORITIES) taskPriority = configMAX_PRIORITIES - 1;
+
   myIsTaskRunning = true;
-  if (xTaskCreatePinnedToCore(fillBuffer, "fillBuffer", 8192, this,                 
-                              tskIDLE_PRIORITY + 1, // One above idle is plenty for this workload while still leaving the
-                                                    // idle task able to run.
-                              &myTaskHandle,        // Task handle
-                              1)                    // Core where the task should run
-                                                    // Pinning the audio filler to core 1 (where loop() runs)
-                                                    // avoids contending with WiFi/BT for CPU time if either is ever enabled.
+  if (xTaskCreatePinnedToCore(fillBuffer, "fillBuffer", 8192, this,
+                              taskPriority,  // see SoundEngine.h for the defaults
+                              &myTaskHandle, // Task handle
+                              taskCore)      // Core where the task should run
       != pdPASS)
   {
     Serial.print("ERROR: ");
